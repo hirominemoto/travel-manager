@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#161a22">
+  <title>旅のしおり</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app"></div>
+  <div id="toast" class="toast" hidden></div>
+
+  <dialog id="itemDialog">
+    <form id="itemForm" method="dialog">
+      <h2 id="itemDialogTitle">行程</h2>
+      <label>名前<input name="title" required placeholder="例：あずさ83号 新宿 → 塩尻"></label>
+      <div class="row">
+        <label>日付<select name="date"></select></label>
+        <label>種類<select name="type"></select></label>
+      </div>
+      <div class="row">
+        <label>出発・開始<input name="time" type="time"></label>
+        <label>到着・終了<input name="endTime" type="time"></label>
+      </div>
+      <div class="row">
+        <label>金額（円）<input name="amount" type="number" inputmode="numeric" min="0" step="1" placeholder="0"></label>
+        <label class="check"><input name="paid" type="checkbox"> 支払い済み</label>
+      </div>
+      <label>メモ<textarea name="memo" rows="3" placeholder="号車・席、乗り換え、注意点など"></textarea></label>
+      <label class="check skip"><input name="skipped" type="checkbox"> 行かなかった（合計から外して残す）</label>
+      <div class="actions">
+        <button type="button" class="danger" id="itemDelete">削除</button>
+        <span class="spacer"></span>
+        <button type="button" id="itemCancel">キャンセル</button>
+        <button type="submit" class="primary">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="tripDialog">
+    <form id="tripForm" method="dialog">
+      <h2 id="tripDialogTitle">旅</h2>
+      <label>旅の名前<input name="name" required placeholder="例：奈良井宿と青鬼集落の旅"></label>
+      <div class="row">
+        <label>出発日<input name="start" type="date" required></label>
+        <label>帰着日<input name="end" type="date" required></label>
+      </div>
+      <label>メモ<textarea name="memo" rows="3" placeholder="持ち物、注意点など"></textarea></label>
+      <div class="actions">
+        <button type="button" class="danger" id="tripDelete">この旅を削除</button>
+        <span class="spacer"></span>
+        <button type="button" id="tripCancel">キャンセル</button>
+        <button type="submit" class="primary">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="seed.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

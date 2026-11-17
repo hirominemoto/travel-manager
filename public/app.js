@@ -104,11 +104,14 @@ function save() {
 }
 
 // ---------- 合計の計算 ----------
+const EXTRA_COLOR = "#c07aa8";
 function totals(t) {
-  const live = t.items.filter((it) => !it.skipped);
   const sum = (arr) => arr.reduce((s, it) => s + (Number(it.amount) || 0), 0);
-  const byType = TYPES.map((ty) => ({ ...ty, amount: sum(live.filter((it) => typeOf(it.type).key === ty.key)) })).filter((x) => x.amount > 0);
-  return { total: sum(live), paid: sum(live.filter((it) => it.paid)), byType, sum };
+  const extras = t.extras || [];
+  const live = t.items.filter((it) => !it.skipped).concat(extras);
+  const byType = TYPES.map((ty) => ({ ...ty, amount: sum(t.items.filter((it) => !it.skipped && typeOf(it.type).key === ty.key)) }));
+  byType.push({ key: "extra", label: "その他の旅費", color: EXTRA_COLOR, amount: sum(extras) });
+  return { total: sum(live), paid: sum(live.filter((it) => it.paid)), byType: byType.filter((x) => x.amount > 0), sum, extraTotal: sum(extras) };
 }
 
 // ---------- 並び順 ----------
@@ -249,7 +252,8 @@ function itemHtml(it) {
 
 function renderTrip() {
   const t = trip;
-  const { total, paid, byType, sum } = totals(t);
+  t.extras = t.extras || [];
+  const { total, paid, byType, sum, extraTotal } = totals(t);
   const days = tripDays(t);
   app.innerHTML = `
     <div class="toolbar no-print">
@@ -278,6 +282,18 @@ function renderTrip() {
           ${items.length > 1 ? `<button class="small ghost" data-sort="${esc(day)}">時刻順に並べ直す</button>` : ""}
         </div>`;
     }).join("")}
+    <div class="day"><h3>その他の旅費</h3><span class="subtotal">小計 ${yen(extraTotal)}</span></div>
+    ${t.extras.map((x) => `
+      <div class="item extra" data-extra="${esc(x.id)}">
+        <div class="time">—</div>
+        <div>
+          <div class="title"><i class="dot" style="background:${EXTRA_COLOR}"></i><span>${esc(x.title)}</span></div>
+          <div class="meta">${(Number(x.amount) || 0) > 0 ? (x.paid ? `<span class="paid">支払い済み</span>` : `<span class="unpaid">未払い</span>`) : ""}</div>
+        </div>
+        <div class="amount">${(Number(x.amount) || 0) > 0 ? yen(x.amount) : ""}</div>
+        ${x.memo ? `<div class="note">${esc(x.memo)}</div>` : ""}
+      </div>`).join("") || `<p class="muted">食事代やグリーン車など、行程に入れない費用をここに足せます</p>`}
+    <div class="toolbar add-day no-print"><button class="small" id="addExtra">＋ その他の旅費を足す</button></div>
     ${byType.length ? `<div class="card breakdown" style="margin-top:22px"><h2>種類ごとの内訳</h2>${byType.map((x) => `<div><span><i class="dot" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${x.color};margin-right:6px"></i>${esc(x.label)}</span><b>${yen(x.amount)}</b></div>`).join("")}</div>` : ""}`;
 
   document.getElementById("back").onclick = () => (location.hash = "#/");
@@ -285,7 +301,9 @@ function renderTrip() {
   document.getElementById("print").onclick = () => window.print();
   app.querySelectorAll("[data-add]").forEach((b) => (b.onclick = () => openItemDialog(null, b.dataset.add)));
   app.querySelectorAll("[data-sort]").forEach((b) => (b.onclick = () => sortDayByTime(b.dataset.sort)));
-  app.querySelectorAll(".item").forEach((el) => {
+  document.getElementById("addExtra").onclick = () => openExtraDialog(null);
+  app.querySelectorAll("[data-extra]").forEach((el) => (el.onclick = () => openExtraDialog(el.dataset.extra)));
+  app.querySelectorAll(".item:not(.extra)").forEach((el) => {
     el.onclick = (e) => {
       const mv = e.target.closest("[data-move]");
       if (mv) {
@@ -362,6 +380,47 @@ document.getElementById("itemDelete").onclick = () => {
   if (!confirm("この行程を削除しますか？（「行かなかった」にすれば、消さずに残せます）")) return;
   trip.items = trip.items.filter((x) => x.id !== editingItemId);
   itemDialog.close();
+  renderTrip();
+  save();
+};
+
+// ---------- その他の旅費の編集 ----------
+const extraDialog = document.getElementById("extraDialog");
+const extraForm = document.getElementById("extraForm");
+let editingExtraId = null;
+
+function openExtraDialog(id) {
+  editingExtraId = id;
+  const x = id ? trip.extras.find((e) => e.id === id) : { title: "", amount: "", paid: false, memo: "" };
+  document.getElementById("extraDialogTitle").textContent = id ? "その他の旅費を直す" : "その他の旅費を足す";
+  extraForm.title.value = x.title || "";
+  extraForm.amount.value = x.amount ? x.amount : "";
+  extraForm.paid.checked = !!x.paid;
+  extraForm.memo.value = x.memo || "";
+  document.getElementById("extraDelete").hidden = !id;
+  extraDialog.showModal();
+}
+
+extraForm.onsubmit = (e) => {
+  e.preventDefault();
+  const data = {
+    title: extraForm.title.value.trim(),
+    amount: Math.max(0, Math.round(Number(extraForm.amount.value) || 0)),
+    paid: extraForm.paid.checked,
+    memo: extraForm.memo.value.trim(),
+  };
+  if (!data.title) return;
+  if (editingExtraId) Object.assign(trip.extras.find((x) => x.id === editingExtraId), data);
+  else trip.extras.push({ id: uid(), ...data });
+  extraDialog.close();
+  renderTrip();
+  save();
+};
+document.getElementById("extraCancel").onclick = () => extraDialog.close();
+document.getElementById("extraDelete").onclick = () => {
+  if (!confirm("この費用を削除しますか？")) return;
+  trip.extras = trip.extras.filter((x) => x.id !== editingExtraId);
+  extraDialog.close();
   renderTrip();
   save();
 };

@@ -38,6 +38,24 @@
     </form>
   </dialog>
 
+  <dialog id="extraDialog">
+    <form id="extraForm" method="dialog">
+      <h2 id="extraDialogTitle">その他の旅費</h2>
+      <label>名前<input name="title" required placeholder="例：1日目の夕食代、グリーン車"></label>
+      <div class="row">
+        <label>金額（円）<input name="amount" type="number" inputmode="numeric" min="0" step="1" placeholder="0"></label>
+        <label class="check"><input name="paid" type="checkbox"> 支払い済み</label>
+      </div>
+      <label>メモ<input name="memo" placeholder="例：青鬼集落は店がないので松本で買っていく"></label>
+      <div class="actions">
+        <button type="button" class="danger" id="extraDelete">削除</button>
+        <span class="spacer"></span>
+        <button type="button" id="extraCancel">キャンセル</button>
+        <button type="submit" class="primary">保存</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="tripDialog">
     <form id="tripForm" method="dialog">
       <h2 id="tripDialogTitle">旅</h2>

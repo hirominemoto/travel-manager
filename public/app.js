@@ -286,7 +286,7 @@ function itemHtml(it) {
         <div class="title"><i class="dot" style="background:${ty.color}"></i><span>${esc(it.title)}</span></div>
         <div class="meta">${esc(ty.label)}${status ? " ・ " + status : ""}</div>
         ${it.memo ? `<div class="note">${esc(it.memo)}</div>` : ""}
-        ${it.photo ? `<div class="item-photo"><img src="${it.photo}" alt="写真" loading="lazy"></div>` : ""}
+        ${(() => { const ps = itemPhotosOf(it); return ps.length ? `<div class="item-photos">${ps.map((s, i) => `<img src="${s}" alt="写真${i+1}" loading="lazy">`).join("")}</div>` : ""; })()}
         ${logs.length ? `<div class="log-list">${logs.map(l => logEntryHtml(l, it.id)).join("")}</div>` : ""}
         <div class="log-add-row no-print"><button type="button" class="log-add-btn" data-log-item="${esc(it.id)}">📝 記録を足す</button></div>
       </div>
@@ -505,13 +505,20 @@ function renderTrip() {
 const itemDialog = document.getElementById("itemDialog");
 const itemForm = document.getElementById("itemForm");
 
-let pendingPhoto = undefined; // undefined=変更なし, null=削除, "data:..."=新しい写真
+let pendingPhotos = []; // 編集中の写真配列（base64文字列）
 let insertAfterId = null; // 新規追加時、どの行程の後ろに入れるか
+
+function itemPhotosOf(it) {
+  // 後方互換: 旧 it.photo(string) → 配列に変換
+  if (it.photos && it.photos.length) return [...it.photos];
+  if (it.photo) return [it.photo];
+  return [];
+}
 
 function openItemDialog(id, day, afterId = null) {
   editingItemId = id;
   insertAfterId = afterId;
-  const it = id ? trip.items.find((x) => x.id === id) : { date: day || trip.start, type: "move", title: "", time: "", endTime: "", amount: "", paid: false, skipped: false, memo: "", photo: null };
+  const it = id ? trip.items.find((x) => x.id === id) : { date: day || trip.start, type: "move", title: "", time: "", endTime: "", amount: "", paid: false, skipped: false, memo: "", photos: [] };
   document.getElementById("itemDialogTitle").textContent = id ? "行程を直す" : "行程を足す";
   const days = tripDays(trip).filter(Boolean);
   if (it.date && !days.includes(it.date)) days.push(it.date);
@@ -526,38 +533,42 @@ function openItemDialog(id, day, afterId = null) {
   itemForm.paid.checked = !!it.paid;
   itemForm.skipped.checked = !!it.skipped;
   itemForm.memo.value = it.memo || "";
-  // 写真
-  pendingPhoto = undefined;
-  itemForm.photoFile.value = "";
-  updatePhotoPreview(it.photo || null);
+  // 写真（複数対応）
+  pendingPhotos = itemPhotosOf(it);
+  document.getElementById("photoFile").value = "";
+  renderPhotoThumbs("photoPreviewWrap", pendingPhotos, (idx) => {
+    pendingPhotos.splice(idx, 1);
+    renderPhotoThumbs("photoPreviewWrap", pendingPhotos, arguments.callee);
+  });
   document.getElementById("itemDelete").hidden = !id;
   itemDialog.showModal();
 }
 
-function updatePhotoPreview(src) {
-  const wrap = document.getElementById("photoPreviewWrap");
-  const removeBtn = document.getElementById("photoRemoveBtn");
-  if (src) {
-    wrap.innerHTML = `<img src="${src}" class="photo-preview-img" alt="写真プレビュー">`;
-    removeBtn.style.display = "";
-  } else {
-    wrap.innerHTML = "";
-    removeBtn.style.display = "none";
-  }
+function renderPhotoThumbs(wrapId, photos, onRemove) {
+  const wrap = document.getElementById(wrapId);
+  wrap.innerHTML = photos.map((src, i) => `
+    <div class="photo-thumb">
+      <img src="${src}" alt="写真${i + 1}" loading="lazy">
+      <button type="button" class="photo-thumb-del" data-idx="${i}" title="削除">✕</button>
+    </div>`).join("");
+  wrap.querySelectorAll(".photo-thumb-del").forEach((btn) => {
+    btn.onclick = () => onRemove(Number(btn.dataset.idx));
+  });
 }
 
 document.getElementById("photoSelectBtn").onclick = () => document.getElementById("photoFile").click();
 document.getElementById("photoFile").onchange = async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const data = await resizeImage(file);
-  pendingPhoto = data;
-  updatePhotoPreview(data);
-};
-document.getElementById("photoRemoveBtn").onclick = () => {
-  pendingPhoto = null;
-  itemForm.photoFile.value = "";
-  updatePhotoPreview(null);
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+  for (const file of files) {
+    const data = await resizeImage(file);
+    pendingPhotos.push(data);
+  }
+  e.target.value = "";
+  renderPhotoThumbs("photoPreviewWrap", pendingPhotos, (idx) => {
+    pendingPhotos.splice(idx, 1);
+    renderPhotoThumbs("photoPreviewWrap", pendingPhotos, arguments.callee);
+  });
 };
 
 function submitItemForm(andAddNext = false) {
@@ -574,13 +585,13 @@ function submitItemForm(andAddNext = false) {
     memo: f.memo.value.trim(),
   };
   if (!data.title) return false;
-  // 写真を反映
-  if (pendingPhoto !== undefined) data.photo = pendingPhoto;
+  // 写真を反映（複数対応）
+  data.photos = [...pendingPhotos];
+  data.photo = null; // 旧フィールドはクリア
   let savedId = null;
   if (editingItemId) {
     const it = trip.items.find((x) => x.id === editingItemId);
     const moved = it.time !== data.time || it.date !== data.date;
-    if (pendingPhoto === undefined) data.photo = it.photo || null;
     Object.assign(it, data);
     if (moved) placeByTime(it);
     savedId = editingItemId;
@@ -611,6 +622,7 @@ function submitItemForm(andAddNext = false) {
 const nextItemPanel = document.getElementById("nextItemPanel");
 const nextItemForm = document.getElementById("nextItemForm");
 let nextItemAfterId = null;
+let pendingNextPhotos = [];
 
 function openNextItemPanel(afterId, day) {
   nextItemAfterId = afterId;
@@ -626,6 +638,12 @@ function openNextItemPanel(afterId, day) {
   nextItemForm.amount.value = "";
   nextItemForm.memo.value = "";
   nextItemForm.paid.checked = false;
+  pendingNextPhotos = [];
+  document.getElementById("nextPhotoFile").value = "";
+  renderPhotoThumbs("nextPhotoPreviewWrap", pendingNextPhotos, (idx) => {
+    pendingNextPhotos.splice(idx, 1);
+    renderPhotoThumbs("nextPhotoPreviewWrap", pendingNextPhotos, arguments.callee);
+  });
   nextItemPanel.hidden = false;
   nextItemForm.title.focus();
   nextItemPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -640,7 +658,7 @@ function submitNextItemForm(andAddMore = false) {
     time: f.time.value, endTime: f.endTime.value,
     amount: Math.max(0, Math.round(Number(f.amount.value) || 0)),
     paid: f.paid.checked, skipped: false, memo: f.memo.value.trim(),
-    photo: null, logs: [],
+    photos: [...pendingNextPhotos], photo: null, logs: [],
   };
   insertAfter(nextItemAfterId, it);
   nextItemAfterId = it.id;
@@ -653,6 +671,21 @@ function submitNextItemForm(andAddMore = false) {
     itemDialog.close();
   }
 }
+
+document.getElementById("nextPhotoSelectBtn").onclick = () => document.getElementById("nextPhotoFile").click();
+document.getElementById("nextPhotoFile").onchange = async (e) => {
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+  for (const file of files) {
+    const data = await resizeImage(file);
+    pendingNextPhotos.push(data);
+  }
+  e.target.value = "";
+  renderPhotoThumbs("nextPhotoPreviewWrap", pendingNextPhotos, (idx) => {
+    pendingNextPhotos.splice(idx, 1);
+    renderPhotoThumbs("nextPhotoPreviewWrap", pendingNextPhotos, arguments.callee);
+  });
+};
 
 nextItemForm.onsubmit = (e) => { e.preventDefault(); submitNextItemForm(false); };
 document.getElementById("nextItemSave").onclick = (e) => { e.preventDefault(); submitNextItemForm(false); };

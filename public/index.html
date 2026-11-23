@@ -30,11 +30,10 @@
       </div>
       <label>メモ・記録<textarea name="memo" rows="3" placeholder="気づいたこと、感想、実費など"></textarea></label>
       <label>写真
-        <div class="photo-input-area" id="photoInputArea">
-          <input type="file" name="photoFile" id="photoFile" accept="image/*" style="display:none">
-          <div id="photoPreviewWrap"></div>
-          <button type="button" class="ghost small" id="photoSelectBtn">📷 写真を選ぶ</button>
-          <button type="button" class="ghost small danger" id="photoRemoveBtn" style="display:none">写真を削除</button>
+        <div class="photo-input-area">
+          <input type="file" id="photoFile" accept="image/*" multiple style="display:none">
+          <div id="photoPreviewWrap" class="photo-thumbs"></div>
+          <button type="button" class="ghost small" id="photoSelectBtn">📷 写真を追加</button>
         </div>
       </label>
       <label class="check skip"><input name="skipped" type="checkbox"> 行かなかった（合計から外して残す）</label>
@@ -65,6 +64,13 @@
           <label class="check"><input name="paid" type="checkbox"> 支払い済み</label>
         </div>
         <label>メモ・記録<textarea name="memo" rows="2" placeholder="気づいたこと、感想など"></textarea></label>
+        <label>写真
+          <div class="photo-input-area">
+            <input type="file" id="nextPhotoFile" accept="image/*" multiple style="display:none">
+            <div id="nextPhotoPreviewWrap" class="photo-thumbs"></div>
+            <button type="button" class="ghost small" id="nextPhotoSelectBtn">📷 写真を追加</button>
+          </div>
+        </label>
         <div class="actions">
           <span class="spacer"></span>
           <button type="button" id="nextItemCancel" class="ghost small">キャンセル</button>

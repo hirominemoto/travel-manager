@@ -10,6 +10,7 @@
 <body>
   <div id="app"></div>
   <div id="toast" class="toast" hidden></div>
+  <button id="fab" class="fab" hidden aria-label="行程を足す">＋</button>
 
   <dialog id="itemDialog">
     <form id="itemForm" method="dialog">
@@ -27,7 +28,15 @@
         <label>金額（円）<input name="amount" type="number" inputmode="numeric" min="0" step="1" placeholder="0"></label>
         <label class="check"><input name="paid" type="checkbox"> 支払い済み</label>
       </div>
-      <label>メモ<textarea name="memo" rows="3" placeholder="号車・席、乗り換え、注意点など"></textarea></label>
+      <label>メモ・記録<textarea name="memo" rows="3" placeholder="気づいたこと、感想、実費など"></textarea></label>
+      <label>写真
+        <div class="photo-input-area" id="photoInputArea">
+          <input type="file" name="photoFile" id="photoFile" accept="image/*" style="display:none">
+          <div id="photoPreviewWrap"></div>
+          <button type="button" class="ghost small" id="photoSelectBtn">📷 写真を選ぶ</button>
+          <button type="button" class="ghost small danger" id="photoRemoveBtn" style="display:none">写真を削除</button>
+        </div>
+      </label>
       <label class="check skip"><input name="skipped" type="checkbox"> 行かなかった（合計から外して残す）</label>
       <div class="actions">
         <button type="button" class="danger" id="itemDelete">削除</button>

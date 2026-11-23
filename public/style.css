@@ -92,6 +92,34 @@ label.skip { color: var(--muted); }
 .add-day { margin: 10px 0 0; }
 .breakdown div { display: flex; justify-content: space-between; padding: 3px 0; }
 
+/* FAB */
+.fab {
+  position: fixed; right: 20px; bottom: calc(24px + env(safe-area-inset-bottom));
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--accent); border: none; color: #fff;
+  font-size: 28px; font-weight: 300; line-height: 1;
+  box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  cursor: pointer; z-index: 40; display: flex; align-items: center; justify-content: center;
+}
+.fab:hover { filter: brightness(1.1); }
+
+/* 各日ヘッダーの＋ボタン */
+.day-add {
+  margin-left: 8px; padding: 2px 10px; font-size: 16px; font-weight: 700;
+  border-radius: 20px; border: 1px solid var(--accent); color: var(--accent);
+  background: transparent; cursor: pointer; line-height: 1.4;
+}
+.day-add:hover { background: rgba(226,103,90,.12); }
+
+/* 行程内の写真 */
+.item-photo { grid-column: 1 / 4; margin-top: 6px; }
+.item-photo img { width: 100%; max-width: 480px; border-radius: 10px; display: block; }
+.item-main { min-width: 0; }
+
+/* ダイアログ内写真 */
+.photo-input-area { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.photo-preview-img { width: 100%; max-width: 320px; border-radius: 10px; margin-bottom: 6px; display: block; }
+
 /* メモ・記録 */
 .note-item { cursor: pointer; }
 .note-item:hover { background: rgba(255,255,255,.02); }
@@ -132,7 +160,7 @@ dialog::backdrop { background: rgba(0,0,0,.6); }
   :root { --bg: #fff; --card: #fff; --card2: #fff; --line: #ccc; --ink: #222; --muted: #666; color-scheme: light; }
   body { font-size: 12px; }
   #app { max-width: none; padding: 0; }
-  .no-print, .item .move, .add-day, .toast { display: none !important; }
+  .no-print, .item .move, .add-day, .toast, .fab, .day-add { display: none !important; }
   .card { break-inside: avoid; }
   .item { break-inside: avoid; cursor: default; }
 }

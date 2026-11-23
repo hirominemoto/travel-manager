@@ -13,8 +13,30 @@ const PASS_KEY = "tabi-pass";
 const WEEK = ["日", "月", "火", "水", "木", "金", "土"];
 
 const app = document.getElementById("app");
+const fab = document.getElementById("fab");
 let trip = null; // いま開いている旅
 let editingItemId = null;
+
+// ---------- 写真リサイズ ----------
+function resizeImage(file, maxPx = 1200, quality = 0.82) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 // ---------- 小道具 ----------
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -188,6 +210,7 @@ function renderLogin(message = "") {
 
 // ---------- 画面：旅の一覧 ----------
 async function renderList() {
+  fab.hidden = true;
   app.innerHTML = `<h1>旅のしおり</h1><p class="sub">行程・時刻・費用をまとめて、合計まで出るプランノート</p><p class="muted">読み込み中…</p>`;
   let trips;
   try {
@@ -240,12 +263,13 @@ function itemHtml(it) {
   return `
     <div class="item${it.skipped ? " skipped" : ""}" data-id="${esc(it.id)}">
       <div class="time">${it.time ? esc(it.time) : "—"}${it.endTime ? `<small>〜${esc(it.endTime)}</small>` : ""}</div>
-      <div>
+      <div class="item-main">
         <div class="title"><i class="dot" style="background:${ty.color}"></i><span>${esc(it.title)}</span></div>
         <div class="meta">${esc(ty.label)}${status ? " ・ " + status : ""}</div>
+        ${it.memo ? `<div class="note">${esc(it.memo)}</div>` : ""}
+        ${it.photo ? `<div class="item-photo"><img src="${it.photo}" alt="写真" loading="lazy"></div>` : ""}
       </div>
       <div class="amount">${amount > 0 ? yen(amount) : ""}</div>
-      ${it.memo ? `<div class="note">${esc(it.memo)}</div>` : ""}
       <div class="move no-print"><button type="button" data-move="-1" aria-label="上へ">↑</button><button type="button" data-move="1" aria-label="下へ">↓</button></div>
     </div>`;
 }
@@ -277,10 +301,9 @@ function renderTrip() {
       const items = t.items.filter((it) => (it.date || "") === day);
       const sub = sum(items.filter((it) => !it.skipped));
       return `
-        <div class="day"><h3>${esc(dateLabel(day))}</h3><span class="subtotal">小計 ${yen(sub)}</span></div>
+        <div class="day"><h3>${esc(dateLabel(day))}</h3><span class="subtotal">小計 ${yen(sub)}</span><button class="day-add no-print" data-add="${esc(day)}" aria-label="この日に行程を足す">＋</button></div>
         ${items.map(itemHtml).join("") || `<p class="muted">まだ行程がありません</p>`}
         <div class="toolbar add-day no-print">
-          <button class="small" data-add="${esc(day)}">＋ 行程を足す</button>
           ${items.length > 1 ? `<button class="small ghost" data-sort="${esc(day)}">時刻順に並べ直す</button>` : ""}
         </div>`;
     }).join("")}
@@ -330,8 +353,16 @@ function renderTrip() {
   document.getElementById("back").onclick = () => (location.hash = "#/");
   document.getElementById("editTrip").onclick = () => openTripDialog(trip);
   document.getElementById("print").onclick = () => window.print();
-  app.querySelectorAll("[data-add]").forEach((b) => (b.onclick = () => openItemDialog(null, b.dataset.add)));
+  app.querySelectorAll("[data-add]").forEach((b) => (b.onclick = (e) => { e.stopPropagation(); openItemDialog(null, b.dataset.add); }));
   app.querySelectorAll("[data-sort]").forEach((b) => (b.onclick = () => sortDayByTime(b.dataset.sort)));
+  // FAB：今日か最初の日に行程を足す
+  fab.hidden = false;
+  fab.onclick = () => {
+    const days = tripDays(trip).filter(Boolean);
+    const today = isoOf(new Date());
+    const day = days.includes(today) ? today : (days[0] || trip.start || "");
+    openItemDialog(null, day);
+  };
   document.getElementById("addExtra").onclick = () => openExtraDialog(null);
   app.querySelectorAll("[data-extra]").forEach((el) => (el.onclick = () => openExtraDialog(el.dataset.extra)));
   document.getElementById("addNote").onclick = () => openNoteDialog(null);
@@ -355,9 +386,11 @@ function renderTrip() {
 const itemDialog = document.getElementById("itemDialog");
 const itemForm = document.getElementById("itemForm");
 
+let pendingPhoto = undefined; // undefined=変更なし, null=削除, "data:..."=新しい写真
+
 function openItemDialog(id, day) {
   editingItemId = id;
-  const it = id ? trip.items.find((x) => x.id === id) : { date: day || trip.start, type: "move", title: "", time: "", endTime: "", amount: "", paid: false, skipped: false, memo: "" };
+  const it = id ? trip.items.find((x) => x.id === id) : { date: day || trip.start, type: "move", title: "", time: "", endTime: "", amount: "", paid: false, skipped: false, memo: "", photo: null };
   document.getElementById("itemDialogTitle").textContent = id ? "行程を直す" : "行程を足す";
   const days = tripDays(trip).filter(Boolean);
   if (it.date && !days.includes(it.date)) days.push(it.date);
@@ -372,9 +405,39 @@ function openItemDialog(id, day) {
   itemForm.paid.checked = !!it.paid;
   itemForm.skipped.checked = !!it.skipped;
   itemForm.memo.value = it.memo || "";
+  // 写真
+  pendingPhoto = undefined;
+  itemForm.photoFile.value = "";
+  updatePhotoPreview(it.photo || null);
   document.getElementById("itemDelete").hidden = !id;
   itemDialog.showModal();
 }
+
+function updatePhotoPreview(src) {
+  const wrap = document.getElementById("photoPreviewWrap");
+  const removeBtn = document.getElementById("photoRemoveBtn");
+  if (src) {
+    wrap.innerHTML = `<img src="${src}" class="photo-preview-img" alt="写真プレビュー">`;
+    removeBtn.style.display = "";
+  } else {
+    wrap.innerHTML = "";
+    removeBtn.style.display = "none";
+  }
+}
+
+document.getElementById("photoSelectBtn").onclick = () => document.getElementById("photoFile").click();
+document.getElementById("photoFile").onchange = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const data = await resizeImage(file);
+  pendingPhoto = data;
+  updatePhotoPreview(data);
+};
+document.getElementById("photoRemoveBtn").onclick = () => {
+  pendingPhoto = null;
+  itemForm.photoFile.value = "";
+  updatePhotoPreview(null);
+};
 
 itemForm.onsubmit = (e) => {
   e.preventDefault();
@@ -391,9 +454,12 @@ itemForm.onsubmit = (e) => {
     memo: f.memo.value.trim(),
   };
   if (!data.title) return;
+  // 写真を反映
+  if (pendingPhoto !== undefined) data.photo = pendingPhoto; // null=削除, "data:..."=新規
   if (editingItemId) {
     const it = trip.items.find((x) => x.id === editingItemId);
     const moved = it.time !== data.time || it.date !== data.date;
+    if (pendingPhoto === undefined) data.photo = it.photo || null; // 変更なし
     Object.assign(it, data);
     if (moved) placeByTime(it);
   } else {

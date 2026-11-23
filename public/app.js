@@ -253,6 +253,8 @@ function itemHtml(it) {
 function renderTrip() {
   const t = trip;
   t.extras = t.extras || [];
+  t.notes = t.notes || [];
+  t.spends = t.spends || [];
   const { total, paid, byType, sum, extraTotal } = totals(t);
   const days = tripDays(t);
   app.innerHTML = `
@@ -294,7 +296,36 @@ function renderTrip() {
         ${x.memo ? `<div class="note">${esc(x.memo)}</div>` : ""}
       </div>`).join("") || `<p class="muted">食事代やグリーン車など、行程に入れない費用をここに足せます</p>`}
     <div class="toolbar add-day no-print"><button class="small" id="addExtra">＋ その他の旅費を足す</button></div>
-    ${byType.length ? `<div class="card breakdown" style="margin-top:22px"><h2>種類ごとの内訳</h2>${byType.map((x) => `<div><span><i class="dot" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${x.color};margin-right:6px"></i>${esc(x.label)}</span><b>${yen(x.amount)}</b></div>`).join("")}</div>` : ""}`;
+    ${byType.length ? `<div class="card breakdown" style="margin-top:22px"><h2>種類ごとの内訳</h2>${byType.map((x) => `<div><span><i class="dot" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${x.color};margin-right:6px"></i>${esc(x.label)}</span><b>${yen(x.amount)}</b></div>`).join("")}</div>` : ""}
+    <div class="section-divider"></div>
+    <div class="day" style="margin-top:28px"><h3>📝 旅のメモ・記録</h3></div>
+    ${(() => {
+      const days = tripDays(t).filter(Boolean);
+      if (!t.notes.length) return `<p class="muted">旅の途中で気づいたこと、感想、ちょっとした記録をここに残せます</p>`;
+      const byDay = {};
+      t.notes.forEach(n => { (byDay[n.date || ""] = byDay[n.date || ""] || []).push(n); });
+      return Object.keys(byDay).sort((a,b) => a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)).map(day => `
+        <div class="note-day-label">${day ? esc(dateLabel(day, false)) : "日付なし"}</div>
+        ${byDay[day].sort((a,b) => (a.time||"").localeCompare(b.time||"")).map(noteHtml).join("")}
+      `).join("");
+    })()}
+    <div class="toolbar add-day no-print"><button class="small" id="addNote">＋ メモを足す</button></div>
+    <div class="section-divider"></div>
+    <div class="day" style="margin-top:28px">
+      <h3>💴 用途別支出</h3>
+      <span class="subtotal">${t.spends.length ? yen(t.spends.reduce((s,x) => s + (Number(x.amount)||0), 0)) : ""}</span>
+    </div>
+    ${t.spends.length ? t.spends.map(x => `
+      <div class="item spend-item" data-spend="${esc(x.id)}">
+        <div class="time">—</div>
+        <div>
+          <div class="title"><span>${esc(x.category)}</span></div>
+          ${x.memo ? `<div class="meta muted">${esc(x.memo)}</div>` : ""}
+        </div>
+        <div class="amount">${yen(x.amount)}</div>
+      </div>`).join("") : `<p class="muted">おみやげ・食事・観光など、用途ごとに金額を入れると自動で合計が出ます</p>`}
+    ${t.spends.length ? `<div class="card spend-total"><span>合計</span><b>${yen(t.spends.reduce((s,x) => s + (Number(x.amount)||0), 0))}</b></div>` : ""}
+    <div class="toolbar add-day no-print"><button class="small" id="addSpend">＋ 用途別支出を足す</button></div>`;
 
   document.getElementById("back").onclick = () => (location.hash = "#/");
   document.getElementById("editTrip").onclick = () => openTripDialog(trip);
@@ -303,7 +334,11 @@ function renderTrip() {
   app.querySelectorAll("[data-sort]").forEach((b) => (b.onclick = () => sortDayByTime(b.dataset.sort)));
   document.getElementById("addExtra").onclick = () => openExtraDialog(null);
   app.querySelectorAll("[data-extra]").forEach((el) => (el.onclick = () => openExtraDialog(el.dataset.extra)));
-  app.querySelectorAll(".item:not(.extra)").forEach((el) => {
+  document.getElementById("addNote").onclick = () => openNoteDialog(null);
+  app.querySelectorAll("[data-note]").forEach((el) => (el.onclick = () => openNoteDialog(el.dataset.note)));
+  document.getElementById("addSpend").onclick = () => openSpendDialog(null);
+  app.querySelectorAll("[data-spend]").forEach((el) => (el.onclick = () => openSpendDialog(el.dataset.spend)));
+  app.querySelectorAll(".item:not(.extra):not(.note-item):not(.spend-item)").forEach((el) => {
     el.onclick = (e) => {
       const mv = e.target.closest("[data-move]");
       if (mv) {
@@ -384,6 +419,18 @@ document.getElementById("itemDelete").onclick = () => {
   save();
 };
 
+// ---------- メモ・記録の表示 ----------
+function noteHtml(n) {
+  return `
+    <div class="item note-item" data-note="${esc(n.id)}">
+      <div class="time">${n.time ? esc(n.time) : "—"}</div>
+      <div>
+        <div class="note-body">${esc(n.body)}</div>
+      </div>
+      <div></div>
+    </div>`;
+}
+
 // ---------- その他の旅費の編集 ----------
 const extraDialog = document.getElementById("extraDialog");
 const extraForm = document.getElementById("extraForm");
@@ -421,6 +468,83 @@ document.getElementById("extraDelete").onclick = () => {
   if (!confirm("この費用を削除しますか？")) return;
   trip.extras = trip.extras.filter((x) => x.id !== editingExtraId);
   extraDialog.close();
+  renderTrip();
+  save();
+};
+
+// ---------- メモ・記録の編集 ----------
+const noteDialog = document.getElementById("noteDialog");
+const noteForm = document.getElementById("noteForm");
+let editingNoteId = null;
+
+function openNoteDialog(id) {
+  editingNoteId = id;
+  const n = id ? trip.notes.find(x => x.id === id) : { date: trip.start || "", time: "", body: "" };
+  document.getElementById("noteDialogTitle").textContent = id ? "メモを直す" : "メモ・記録を足す";
+  const days = tripDays(trip).filter(Boolean);
+  noteForm.date.innerHTML = days.map(d => `<option value="${esc(d)}">${esc(dateLabel(d, false))}</option>`).join("") + `<option value="">日付なし</option>`;
+  noteForm.date.value = n.date || "";
+  noteForm.time.value = n.time || "";
+  noteForm.body.value = n.body || "";
+  document.getElementById("noteDelete").hidden = !id;
+  noteDialog.showModal();
+}
+
+noteForm.onsubmit = (e) => {
+  e.preventDefault();
+  const data = { date: noteForm.date.value, time: noteForm.time.value, body: noteForm.body.value.trim() };
+  if (!data.body) return;
+  trip.notes = trip.notes || [];
+  if (editingNoteId) Object.assign(trip.notes.find(x => x.id === editingNoteId), data);
+  else trip.notes.push({ id: uid(), ...data });
+  noteDialog.close();
+  renderTrip();
+  save();
+};
+document.getElementById("noteCancel").onclick = () => noteDialog.close();
+document.getElementById("noteDelete").onclick = () => {
+  if (!confirm("このメモを削除しますか？")) return;
+  trip.notes = trip.notes.filter(x => x.id !== editingNoteId);
+  noteDialog.close();
+  renderTrip();
+  save();
+};
+
+// ---------- 用途別支出の編集 ----------
+const spendDialog = document.getElementById("spendDialog");
+const spendForm = document.getElementById("spendForm");
+let editingSpendId = null;
+
+function openSpendDialog(id) {
+  editingSpendId = id;
+  const x = id ? trip.spends.find(s => s.id === id) : { category: "", amount: "", memo: "" };
+  spendForm.category.value = x.category || "";
+  spendForm.amount.value = x.amount ? x.amount : "";
+  spendForm.memo.value = x.memo || "";
+  document.getElementById("spendDelete").hidden = !id;
+  spendDialog.showModal();
+}
+
+spendForm.onsubmit = (e) => {
+  e.preventDefault();
+  const data = {
+    category: spendForm.category.value.trim(),
+    amount: Math.max(0, Math.round(Number(spendForm.amount.value) || 0)),
+    memo: spendForm.memo.value.trim(),
+  };
+  if (!data.category || !data.amount) return;
+  trip.spends = trip.spends || [];
+  if (editingSpendId) Object.assign(trip.spends.find(x => x.id === editingSpendId), data);
+  else trip.spends.push({ id: uid(), ...data });
+  spendDialog.close();
+  renderTrip();
+  save();
+};
+document.getElementById("spendCancel").onclick = () => spendDialog.close();
+document.getElementById("spendDelete").onclick = () => {
+  if (!confirm("この支出を削除しますか？")) return;
+  trip.spends = trip.spends.filter(x => x.id !== editingSpendId);
+  spendDialog.close();
   renderTrip();
   save();
 };

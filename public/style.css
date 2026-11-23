@@ -92,6 +92,23 @@ label.skip { color: var(--muted); }
 .add-day { margin: 10px 0 0; }
 .breakdown div { display: flex; justify-content: space-between; padding: 3px 0; }
 
+/* メモ・記録 */
+.note-item { cursor: pointer; }
+.note-item:hover { background: rgba(255,255,255,.02); }
+.note-body { white-space: pre-wrap; font-size: 14px; line-height: 1.6; }
+.note-day-label { font-size: 12px; color: var(--muted); font-weight: 700; padding: 8px 0 2px; border-bottom: 1px solid var(--line); margin-bottom: 2px; }
+.section-divider { height: 1px; background: var(--line); margin: 24px 0 0; }
+
+/* 用途別支出 */
+.spend-item { cursor: pointer; }
+.spend-item:hover { background: rgba(255,255,255,.02); }
+.spend-total {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 16px; margin-top: 8px; padding: 10px 16px;
+  background: var(--card2); border: 1px solid var(--line); border-radius: 12px;
+}
+.spend-total b { font-size: 20px; font-variant-numeric: tabular-nums; }
+
 .toast {
   position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%);
   background: #2b3242; border: 1px solid var(--line); padding: 8px 16px; border-radius: 20px; font-size: 13px; z-index: 50;

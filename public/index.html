@@ -56,6 +56,38 @@
     </form>
   </dialog>
 
+  <dialog id="noteDialog">
+    <form id="noteForm" method="dialog">
+      <h2 id="noteDialogTitle">メモ・記録</h2>
+      <label>内容<textarea name="body" rows="4" placeholder="気づいたこと、感想、ちょっとしたメモなど" required></textarea></label>
+      <div class="row">
+        <label>日付<select name="date"></select></label>
+        <label>時刻（任意）<input name="time" type="time"></label>
+      </div>
+      <div class="actions">
+        <button type="button" class="danger" id="noteDelete">削除</button>
+        <span class="spacer"></span>
+        <button type="button" id="noteCancel">キャンセル</button>
+        <button type="submit" class="primary">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="spendDialog">
+    <form id="spendForm" method="dialog">
+      <h2>用途別支出を追加</h2>
+      <label>用途<input name="category" required placeholder="例：おみやげ、食事、観光"></label>
+      <label>金額（円）<input name="amount" type="number" inputmode="numeric" min="0" step="1" placeholder="0" required></label>
+      <label>メモ（任意）<input name="memo" placeholder="例：松本の駅ビルで"></label>
+      <div class="actions">
+        <button type="button" class="danger" id="spendDelete">削除</button>
+        <span class="spacer"></span>
+        <button type="button" id="spendCancel">キャンセル</button>
+        <button type="submit" class="primary">保存</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="tripDialog">
     <form id="tripForm" method="dialog">
       <h2 id="tripDialogTitle">旅</h2>

@@ -143,6 +143,49 @@ label.skip { color: var(--muted); }
 .note-day-label { font-size: 12px; color: var(--muted); font-weight: 700; padding: 8px 0 2px; border-bottom: 1px solid var(--line); margin-bottom: 2px; }
 .section-divider { height: 1px; background: var(--line); margin: 24px 0 0; }
 
+/* インライン行程追加フォーム */
+.item-add-row { position: relative; }
+.inline-add-form {
+  margin: 0 0 2px 0;
+  background: var(--card2);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  padding: 12px 14px 10px;
+  animation: slideDown 0.15s ease;
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.inline-add-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;
+}
+.inline-add-label { font-size: 13px; font-weight: 700; color: var(--accent); }
+.inline-add-hint { font-size: 11px; color: var(--muted); margin-bottom: 10px; }
+.inline-add-close {
+  background: transparent; border: none; color: var(--muted); cursor: pointer;
+  font-size: 14px; padding: 2px 4px; line-height: 1;
+}
+.inline-add-close:hover { color: var(--ink); }
+.inline-add-fields { display: flex; flex-direction: column; gap: 8px; }
+.inline-add-row { display: flex; gap: 8px; }
+.inline-label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); flex: 1; }
+.inline-label input, .inline-label select {
+  background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+  color: var(--ink); padding: 7px 10px; font-size: 14px; width: 100%;
+  font-family: inherit;
+}
+.ia-title {
+  background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+  color: var(--ink); padding: 8px 12px; font-size: 14px; width: 100%;
+  font-family: inherit;
+}
+.ia-title:focus, .inline-label input:focus, .inline-label select:focus {
+  outline: none; border-color: var(--accent);
+}
+.inline-add-actions { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+.inline-add-save { padding: 7px 20px; font-size: 14px; }
+
 /* ログ（行程にぶら下がる記録） */
 .log-list { margin-top: 8px; border-left: 2px solid var(--line); padding-left: 10px; }
 .log-entry {

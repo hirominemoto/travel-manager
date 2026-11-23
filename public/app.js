@@ -293,7 +293,37 @@ function itemHtml(it) {
       <div class="amount">${amount > 0 ? yen(amount) : ""}</div>
       <div class="move no-print"><button type="button" data-move="-1" aria-label="上へ">↑</button><button type="button" data-move="1" aria-label="下へ">↓</button></div>
     </div>
-    <div class="item-add-row no-print"><button type="button" class="item-add-btn" data-add-after="${esc(it.id)}" data-day="${esc(it.date || '')}">＋</button></div>`;
+    <div class="item-add-row no-print">
+      <button type="button" class="item-add-btn" data-add-after="${esc(it.id)}" data-day="${esc(it.date || '')}">＋</button>
+      <div class="inline-add-form" id="inline-add-${esc(it.id)}" hidden>
+        <div class="inline-add-header">
+          <span class="inline-add-label">⊕ 次の行程を追加</span>
+          <button type="button" class="inline-add-close" data-close-inline="${esc(it.id)}">✕</button>
+        </div>
+        <div class="inline-add-hint">前の行程を見ながら入力</div>
+        <div class="inline-add-fields">
+          <div class="inline-add-row">
+            <label class="inline-label">開始<input type="time" class="ia-time" data-ia-field="time"></label>
+            <label class="inline-label">終了<input type="time" class="ia-endtime" data-ia-field="endTime"></label>
+          </div>
+          <input type="text" class="ia-title" data-ia-field="title" placeholder="行程名（例：白馬駅周辺を散策）">
+          <div class="inline-add-row">
+            <label class="inline-label">種類
+              <select class="ia-type" data-ia-field="type">
+                ${TYPES.map(t => `<option value="${t.key}">${t.label}</option>`).join("")}
+              </select>
+            </label>
+            <label class="inline-label">金額
+              <input type="number" class="ia-amount" data-ia-field="amount" placeholder="0" min="0" inputmode="numeric">
+            </label>
+          </div>
+        </div>
+        <div class="inline-add-actions">
+          <button type="button" class="inline-add-save primary" data-save-inline="${esc(it.id)}" data-day="${esc(it.date || '')}">保存</button>
+          <button type="button" class="ghost small" data-close-inline="${esc(it.id)}">キャンセル</button>
+        </div>
+      </div>
+    </div>`;
 }
 
 function renderTrip() {
@@ -394,7 +424,54 @@ function renderTrip() {
   app.querySelectorAll("[data-add-after]").forEach((b) => {
     b.onclick = (e) => {
       e.stopPropagation();
-      openItemDialog(null, b.dataset.day, b.dataset.addAfter);
+      const afterId = b.dataset.addAfter;
+      const form = document.getElementById(`inline-add-${afterId}`);
+      if (!form) { openItemDialog(null, b.dataset.day, afterId); return; }
+      // 他に開いているインライン欄を閉じる
+      app.querySelectorAll(".inline-add-form").forEach(f => { if (f !== form) f.hidden = true; });
+      form.hidden = !form.hidden;
+      if (!form.hidden) {
+        // 前の行程の終了時刻か開始時刻を初期値に
+        const prevItem = trip.items.find(x => x.id === afterId);
+        const defaultTime = (prevItem && (prevItem.endTime || prevItem.time)) || "";
+        form.querySelector(".ia-time").value = defaultTime;
+        form.querySelector(".ia-endtime").value = "";
+        form.querySelector(".ia-title").value = "";
+        form.querySelector(".ia-amount").value = "";
+        form.querySelector(".ia-title").focus();
+      }
+    };
+  });
+  // インライン入力フォームの保存・キャンセル
+  app.querySelectorAll("[data-save-inline]").forEach((b) => {
+    b.onclick = (e) => {
+      e.stopPropagation();
+      const afterId = b.dataset.saveInline;
+      const day = b.dataset.day;
+      const form = document.getElementById(`inline-add-${afterId}`);
+      const title = form.querySelector(".ia-title").value.trim();
+      if (!title) { form.querySelector(".ia-title").focus(); return; }
+      const it = {
+        id: uid(),
+        title,
+        date: day,
+        type: form.querySelector(".ia-type").value,
+        time: form.querySelector(".ia-time").value,
+        endTime: form.querySelector(".ia-endtime").value,
+        amount: Math.max(0, Math.round(Number(form.querySelector(".ia-amount").value) || 0)),
+        paid: false, skipped: false, memo: "", photo: null, logs: [],
+      };
+      insertAfter(afterId, it);
+      form.hidden = true;
+      renderTrip();
+      save();
+    };
+  });
+  app.querySelectorAll("[data-close-inline]").forEach((b) => {
+    b.onclick = (e) => {
+      e.stopPropagation();
+      const form = document.getElementById(`inline-add-${b.dataset.closeInline}`);
+      if (form) form.hidden = true;
     };
   });
   // ログ「記録を足す」ボタン

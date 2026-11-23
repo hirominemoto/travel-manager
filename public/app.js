@@ -597,14 +597,23 @@ function submitItemForm(andAddNext = false) {
       trip.items.splice(last + 1, 0, it);
     }
   }
+  itemDialog.close();
   renderTrip();
   save();
   if (andAddNext) {
-    // 保存した行程の次として新規ダイアログを開く
-    const savedIt = trip.items.find(x => x.id === savedId);
-    openItemDialog(null, savedIt ? savedIt.date : data.date, savedId);
-  } else {
-    itemDialog.close();
+    // 保存した行程のすぐ下のインライン欄を展開する
+    const form = document.getElementById(`inline-add-${savedId}`);
+    if (form) {
+      form.hidden = false;
+      const savedIt = trip.items.find(x => x.id === savedId);
+      const defaultTime = savedIt && (savedIt.endTime || savedIt.time) || "";
+      form.querySelector(".ia-time").value = defaultTime;
+      form.querySelector(".ia-endtime").value = "";
+      form.querySelector(".ia-title").value = "";
+      form.querySelector(".ia-amount").value = "";
+      form.querySelector(".ia-title").focus();
+      form.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   }
   return true;
 }

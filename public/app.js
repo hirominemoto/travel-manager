@@ -560,8 +560,7 @@ document.getElementById("photoRemoveBtn").onclick = () => {
   updatePhotoPreview(null);
 };
 
-itemForm.onsubmit = (e) => {
-  e.preventDefault();
+function submitItemForm(andAddNext = false) {
   const f = itemForm;
   const data = {
     title: f.title.value.trim(),
@@ -574,33 +573,44 @@ itemForm.onsubmit = (e) => {
     skipped: f.skipped.checked,
     memo: f.memo.value.trim(),
   };
-  if (!data.title) return;
+  if (!data.title) return false;
   // 写真を反映
-  if (pendingPhoto !== undefined) data.photo = pendingPhoto; // null=削除, "data:..."=新規
+  if (pendingPhoto !== undefined) data.photo = pendingPhoto;
+  let savedId = null;
   if (editingItemId) {
     const it = trip.items.find((x) => x.id === editingItemId);
     const moved = it.time !== data.time || it.date !== data.date;
-    if (pendingPhoto === undefined) data.photo = it.photo || null; // 変更なし
+    if (pendingPhoto === undefined) data.photo = it.photo || null;
     Object.assign(it, data);
     if (moved) placeByTime(it);
+    savedId = editingItemId;
   } else {
     const it = { id: uid(), ...data };
+    savedId = it.id;
     if (insertAfterId) {
-      // 行程の「＋」から追加：指定行程のすぐ後ろ
       insertAfter(insertAfterId, it);
     } else if (data.time) {
       placeByTime(it);
     } else {
-      // 時刻なし：その日の最後に足す
       let last = -1;
       trip.items.forEach((x, i) => { if (x.date <= data.date) last = i; });
       trip.items.splice(last + 1, 0, it);
     }
   }
-  itemDialog.close();
   renderTrip();
   save();
-};
+  if (andAddNext) {
+    // 保存した行程の次として新規ダイアログを開く
+    const savedIt = trip.items.find(x => x.id === savedId);
+    openItemDialog(null, savedIt ? savedIt.date : data.date, savedId);
+  } else {
+    itemDialog.close();
+  }
+  return true;
+}
+
+itemForm.onsubmit = (e) => { e.preventDefault(); submitItemForm(false); };
+document.getElementById("itemSaveAndAdd").onclick = () => submitItemForm(true);
 document.getElementById("itemCancel").onclick = () => itemDialog.close();
 document.getElementById("itemDelete").onclick = () => {
   if (!confirm("この行程を削除しますか？（「行かなかった」にすれば、消さずに残せます）")) return;

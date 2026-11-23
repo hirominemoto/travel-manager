@@ -545,10 +545,9 @@ function itemPhotosOf(it) {
 }
 
 // ---------- 支出リスト UI ----------
-function renderExpenseRows(listId, totalId, totalAmtId, expenses, onRemove) {
+// expenses 配列を listId に描画し、削除・入力イベントをつなぐ
+function renderExpenseRows(listId, totalId, totalAmtId, expenses) {
   const list = document.getElementById(listId);
-  const totalEl = document.getElementById(totalId);
-  const totalAmtEl = document.getElementById(totalAmtId);
   list.innerHTML = expenses.map((e, i) => `
     <div class="expense-row" data-idx="${i}">
       <input type="text" class="expense-name" placeholder="名前（例：電車代）" value="${esc(e.name || "")}" data-idx="${i}">
@@ -556,18 +555,23 @@ function renderExpenseRows(listId, totalId, totalAmtId, expenses, onRemove) {
       <label class="expense-paid"><input type="checkbox" class="expense-paid-chk" data-idx="${i}"${e.paid ? " checked" : ""}> 済</label>
       <button type="button" class="expense-del" data-idx="${i}" title="削除">✕</button>
     </div>`).join("");
-  // イベント
   list.querySelectorAll(".expense-name").forEach(inp => {
     inp.oninput = () => { expenses[Number(inp.dataset.idx)].name = inp.value; };
   });
   list.querySelectorAll(".expense-amount").forEach(inp => {
-    inp.oninput = () => { expenses[Number(inp.dataset.idx)].amount = Math.max(0, Math.round(Number(inp.value) || 0)); updateExpenseTotal(totalId, totalAmtId, expenses); };
+    inp.oninput = () => {
+      expenses[Number(inp.dataset.idx)].amount = Math.max(0, Math.round(Number(inp.value) || 0));
+      updateExpenseTotal(totalId, totalAmtId, expenses);
+    };
   });
   list.querySelectorAll(".expense-paid-chk").forEach(chk => {
     chk.onchange = () => { expenses[Number(chk.dataset.idx)].paid = chk.checked; };
   });
   list.querySelectorAll(".expense-del").forEach(btn => {
-    btn.onclick = () => { onRemove(Number(btn.dataset.idx)); };
+    btn.onclick = () => {
+      expenses.splice(Number(btn.dataset.idx), 1);
+      renderExpenseRows(listId, totalId, totalAmtId, expenses);
+    };
   });
   updateExpenseTotal(totalId, totalAmtId, expenses);
 }
@@ -585,15 +589,7 @@ function updateExpenseTotal(totalId, totalAmtId, expenses) {
 }
 function addExpenseRow(listId, totalId, totalAmtId, expenses) {
   expenses.push({ id: uid(), name: "", amount: 0, paid: false });
-  renderExpenseRows(listId, totalId, totalAmtId, expenses, (idx) => {
-    expenses.splice(idx, 1);
-    renderExpenseRows(listId, totalId, totalAmtId, expenses, (i) => {
-      expenses.splice(i, 1);
-      renderExpenseRows(listId, totalId, totalAmtId, expenses, arguments.callee);
-      updateExpenseTotal(totalId, totalAmtId, expenses);
-    });
-    updateExpenseTotal(totalId, totalAmtId, expenses);
-  });
+  renderExpenseRows(listId, totalId, totalAmtId, expenses);
   // 追加した行の名前inputにフォーカス
   const rows = document.querySelectorAll(`#${listId} .expense-row`);
   if (rows.length > 0) rows[rows.length - 1].querySelector(".expense-name").focus();
@@ -617,26 +613,17 @@ function openItemDialog(id, day, afterId = null) {
   itemForm.memo.value = it.memo || "";
   // 支出リスト（後方互換: 旧 amount → expenses に変換）
   pendingExpenses = itemExpenses(it).map(e => ({ ...e }));
-  renderExpenseRows("expensesList", "expensesTotal", "expensesTotalAmt", pendingExpenses, (idx) => {
-    pendingExpenses.splice(idx, 1);
-    renderExpenseRows("expensesList", "expensesTotal", "expensesTotalAmt", pendingExpenses, (i) => {
-      pendingExpenses.splice(i, 1);
-      renderExpenseRows("expensesList", "expensesTotal", "expensesTotalAmt", pendingExpenses, arguments.callee);
-    });
-  });
+  renderExpenseRows("expensesList", "expensesTotal", "expensesTotalAmt", pendingExpenses);
   document.getElementById("addExpenseBtn").onclick = () => addExpenseRow("expensesList", "expensesTotal", "expensesTotalAmt", pendingExpenses);
   // 写真（複数対応）
   pendingPhotos = itemPhotosOf(it);
   document.getElementById("photoFile").value = "";
-  renderPhotoThumbs("photoPreviewWrap", pendingPhotos, (idx) => {
-    pendingPhotos.splice(idx, 1);
-    renderPhotoThumbs("photoPreviewWrap", pendingPhotos, arguments.callee);
-  });
+  renderPhotoThumbs("photoPreviewWrap", pendingPhotos);
   document.getElementById("itemDelete").hidden = !id;
   itemDialog.showModal();
 }
 
-function renderPhotoThumbs(wrapId, photos, onRemove) {
+function renderPhotoThumbs(wrapId, photos) {
   const wrap = document.getElementById(wrapId);
   wrap.innerHTML = photos.map((src, i) => `
     <div class="photo-thumb">
@@ -644,7 +631,10 @@ function renderPhotoThumbs(wrapId, photos, onRemove) {
       <button type="button" class="photo-thumb-del" data-idx="${i}" title="削除">✕</button>
     </div>`).join("");
   wrap.querySelectorAll(".photo-thumb-del").forEach((btn) => {
-    btn.onclick = () => onRemove(Number(btn.dataset.idx));
+    btn.onclick = () => {
+      photos.splice(Number(btn.dataset.idx), 1);
+      renderPhotoThumbs(wrapId, photos);
+    };
   });
 }
 
@@ -657,10 +647,7 @@ document.getElementById("photoFile").onchange = async (e) => {
     pendingPhotos.push(data);
   }
   e.target.value = "";
-  renderPhotoThumbs("photoPreviewWrap", pendingPhotos, (idx) => {
-    pendingPhotos.splice(idx, 1);
-    renderPhotoThumbs("photoPreviewWrap", pendingPhotos, arguments.callee);
-  });
+  renderPhotoThumbs("photoPreviewWrap", pendingPhotos);
 };
 
 function submitItemForm(andAddNext = false) {
@@ -734,20 +721,11 @@ function openNextItemPanel(afterId, day) {
   nextItemForm.memo.value = "";
   // 支出リスト初期化
   pendingNextExpenses = [];
-  renderExpenseRows("nextExpensesList", "nextExpensesTotal", "nextExpensesTotalAmt", pendingNextExpenses, (idx) => {
-    pendingNextExpenses.splice(idx, 1);
-    renderExpenseRows("nextExpensesList", "nextExpensesTotal", "nextExpensesTotalAmt", pendingNextExpenses, (i) => {
-      pendingNextExpenses.splice(i, 1);
-      renderExpenseRows("nextExpensesList", "nextExpensesTotal", "nextExpensesTotalAmt", pendingNextExpenses, arguments.callee);
-    });
-  });
+  renderExpenseRows("nextExpensesList", "nextExpensesTotal", "nextExpensesTotalAmt", pendingNextExpenses);
   document.getElementById("nextAddExpenseBtn").onclick = () => addExpenseRow("nextExpensesList", "nextExpensesTotal", "nextExpensesTotalAmt", pendingNextExpenses);
   pendingNextPhotos = [];
   document.getElementById("nextPhotoFile").value = "";
-  renderPhotoThumbs("nextPhotoPreviewWrap", pendingNextPhotos, (idx) => {
-    pendingNextPhotos.splice(idx, 1);
-    renderPhotoThumbs("nextPhotoPreviewWrap", pendingNextPhotos, arguments.callee);
-  });
+  renderPhotoThumbs("nextPhotoPreviewWrap", pendingNextPhotos);
   nextItemPanel.hidden = false;
   nextItemForm.title.focus();
   nextItemPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -788,10 +766,7 @@ document.getElementById("nextPhotoFile").onchange = async (e) => {
     pendingNextPhotos.push(data);
   }
   e.target.value = "";
-  renderPhotoThumbs("nextPhotoPreviewWrap", pendingNextPhotos, (idx) => {
-    pendingNextPhotos.splice(idx, 1);
-    renderPhotoThumbs("nextPhotoPreviewWrap", pendingNextPhotos, arguments.callee);
-  });
+  renderPhotoThumbs("nextPhotoPreviewWrap", pendingNextPhotos);
 };
 
 nextItemForm.onsubmit = (e) => { e.preventDefault(); submitNextItemForm(false); };

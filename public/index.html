@@ -46,6 +46,33 @@
         <button type="submit" class="primary">保存</button>
       </div>
     </form>
+
+    <!-- 次の行程をここにぶら下げる -->
+    <div id="nextItemPanel" hidden>
+      <div class="next-item-divider">▼ 次の行程</div>
+      <form id="nextItemForm">
+        <label>名前<input name="title" required placeholder="例：白馬駅周辺を散策"></label>
+        <div class="row">
+          <label>日付<select name="date"></select></label>
+          <label>種類<select name="type"></select></label>
+        </div>
+        <div class="row">
+          <label>出発・開始<input name="time" type="time"></label>
+          <label>到着・終了<input name="endTime" type="time"></label>
+        </div>
+        <div class="row">
+          <label>金額（円）<input name="amount" type="number" inputmode="numeric" min="0" step="1" placeholder="0"></label>
+          <label class="check"><input name="paid" type="checkbox"> 支払い済み</label>
+        </div>
+        <label>メモ・記録<textarea name="memo" rows="2" placeholder="気づいたこと、感想など"></textarea></label>
+        <div class="actions">
+          <span class="spacer"></span>
+          <button type="button" id="nextItemCancel" class="ghost small">キャンセル</button>
+          <button type="button" id="nextItemSaveAndAdd" class="ghost">さらに追加 ＋</button>
+          <button type="submit" id="nextItemSave" class="primary">保存して閉じる</button>
+        </div>
+      </form>
+    </div>
   </dialog>
 
   <dialog id="extraDialog">

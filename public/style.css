@@ -143,6 +143,24 @@ label.skip { color: var(--muted); }
 .note-day-label { font-size: 12px; color: var(--muted); font-weight: 700; padding: 8px 0 2px; border-bottom: 1px solid var(--line); margin-bottom: 2px; }
 .section-divider { height: 1px; background: var(--line); margin: 24px 0 0; }
 
+/* ダイアログ内「次の行程」パネル */
+#nextItemPanel { margin-top: 16px; border-top: 2px solid var(--accent); padding-top: 14px; }
+.next-item-divider {
+  font-size: 12px; font-weight: 700; color: var(--accent);
+  margin-bottom: 12px; letter-spacing: .05em;
+}
+#nextItemForm label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+#nextItemForm input, #nextItemForm select, #nextItemForm textarea {
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+  color: var(--ink); padding: 8px 10px; font-size: 14px; font-family: inherit; width: 100%;
+}
+#nextItemForm input:focus, #nextItemForm select:focus, #nextItemForm textarea:focus {
+  outline: none; border-color: var(--accent);
+}
+#nextItemForm .row { display: flex; gap: 10px; }
+#nextItemForm .row label { flex: 1; }
+#nextItemForm .check { flex-direction: row; align-items: center; gap: 6px; color: var(--ink); }
+
 /* インライン行程追加フォーム */
 .item-add-row { position: relative; }
 .inline-add-form {

@@ -597,26 +597,67 @@ function submitItemForm(andAddNext = false) {
       trip.items.splice(last + 1, 0, it);
     }
   }
-  itemDialog.close();
   renderTrip();
   save();
   if (andAddNext) {
-    // 保存した行程のすぐ下のインライン欄を展開する
-    const form = document.getElementById(`inline-add-${savedId}`);
-    if (form) {
-      form.hidden = false;
-      const savedIt = trip.items.find(x => x.id === savedId);
-      const defaultTime = savedIt && (savedIt.endTime || savedIt.time) || "";
-      form.querySelector(".ia-time").value = defaultTime;
-      form.querySelector(".ia-endtime").value = "";
-      form.querySelector(".ia-title").value = "";
-      form.querySelector(".ia-amount").value = "";
-      form.querySelector(".ia-title").focus();
-      form.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
+    openNextItemPanel(savedId, data.date);
+  } else {
+    itemDialog.close();
   }
   return true;
 }
+
+// ---------- 次の行程パネル（ダイアログ内にぶら下がる） ----------
+const nextItemPanel = document.getElementById("nextItemPanel");
+const nextItemForm = document.getElementById("nextItemForm");
+let nextItemAfterId = null;
+
+function openNextItemPanel(afterId, day) {
+  nextItemAfterId = afterId;
+  const prevIt = trip.items.find(x => x.id === afterId);
+  const defaultTime = prevIt && (prevIt.endTime || prevIt.time) || "";
+  const days = tripDays(trip).filter(Boolean);
+  nextItemForm.date.innerHTML = days.map(d => `<option value="${esc(d)}">${esc(dateLabel(d, false))}</option>`).join("");
+  nextItemForm.type.innerHTML = TYPES.map(t => `<option value="${t.key}">${esc(t.label)}</option>`).join("");
+  nextItemForm.date.value = day || days[0] || "";
+  nextItemForm.time.value = defaultTime;
+  nextItemForm.endTime.value = "";
+  nextItemForm.title.value = "";
+  nextItemForm.amount.value = "";
+  nextItemForm.memo.value = "";
+  nextItemForm.paid.checked = false;
+  nextItemPanel.hidden = false;
+  nextItemForm.title.focus();
+  nextItemPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function submitNextItemForm(andAddMore = false) {
+  const f = nextItemForm;
+  const title = f.title.value.trim();
+  if (!title) { f.title.focus(); return; }
+  const it = {
+    id: uid(), title, date: f.date.value, type: f.type.value,
+    time: f.time.value, endTime: f.endTime.value,
+    amount: Math.max(0, Math.round(Number(f.amount.value) || 0)),
+    paid: f.paid.checked, skipped: false, memo: f.memo.value.trim(),
+    photo: null, logs: [],
+  };
+  insertAfter(nextItemAfterId, it);
+  nextItemAfterId = it.id;
+  renderTrip();
+  save();
+  if (andAddMore) {
+    openNextItemPanel(it.id, it.date);
+  } else {
+    nextItemPanel.hidden = true;
+    itemDialog.close();
+  }
+}
+
+nextItemForm.onsubmit = (e) => { e.preventDefault(); submitNextItemForm(false); };
+document.getElementById("nextItemSave").onclick = (e) => { e.preventDefault(); submitNextItemForm(false); };
+document.getElementById("nextItemSaveAndAdd").onclick = () => submitNextItemForm(true);
+document.getElementById("nextItemCancel").onclick = () => { nextItemPanel.hidden = true; };
 
 itemForm.onsubmit = (e) => { e.preventDefault(); submitItemForm(false); };
 document.getElementById("itemSaveAndAdd").onclick = () => submitItemForm(true);

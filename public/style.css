@@ -143,6 +143,24 @@ label.skip { color: var(--muted); }
 .note-day-label { font-size: 12px; color: var(--muted); font-weight: 700; padding: 8px 0 2px; border-bottom: 1px solid var(--line); margin-bottom: 2px; }
 .section-divider { height: 1px; background: var(--line); margin: 24px 0 0; }
 
+/* ログ（行程にぶら下がる記録） */
+.log-list { margin-top: 8px; border-left: 2px solid var(--line); padding-left: 10px; }
+.log-entry {
+  display: grid; grid-template-columns: 44px 1fr; gap: 4px 8px;
+  padding: 5px 6px 5px 0; cursor: pointer; border-radius: 6px; margin-bottom: 2px;
+}
+.log-entry:hover { background: rgba(255,255,255,.04); }
+.log-time { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; padding-top: 2px; }
+.log-text { font-size: 13px; white-space: pre-wrap; line-height: 1.55; }
+.log-photo { margin-top: 4px; }
+.log-photo img { width: 100%; max-width: 320px; border-radius: 8px; display: block; }
+.log-add-row { margin-top: 6px; }
+.log-add-btn {
+  font-size: 12px; color: var(--muted); background: transparent; border: 1px dashed var(--line);
+  border-radius: 20px; padding: 2px 10px; cursor: pointer;
+}
+.log-add-btn:hover { color: var(--accent); border-color: var(--accent); background: rgba(226,103,90,.08); }
+
 /* 用途別支出 */
 .spend-item { cursor: pointer; }
 .spend-item:hover { background: rgba(255,255,255,.02); }

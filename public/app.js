@@ -263,10 +263,22 @@ async function loadTrip(id) {
   }
 }
 
+function logEntryHtml(log, itemId) {
+  return `
+    <div class="log-entry" data-log-id="${esc(log.id)}" data-item-id="${esc(itemId)}">
+      <div class="log-time">${log.time ? esc(log.time) : "—"}</div>
+      <div class="log-body">
+        ${log.body ? `<div class="log-text">${esc(log.body)}</div>` : ""}
+        ${log.photo ? `<div class="log-photo"><img src="${log.photo}" alt="写真" loading="lazy"></div>` : ""}
+      </div>
+    </div>`;
+}
+
 function itemHtml(it) {
   const ty = typeOf(it.type);
   const amount = Number(it.amount) || 0;
   const status = amount > 0 ? (it.paid ? `<span class="paid">支払い済み</span>` : `<span class="unpaid">未払い</span>`) : "";
+  const logs = (it.logs || []).slice().sort((a, b) => (a.time || "").localeCompare(b.time || ""));
   return `
     <div class="item${it.skipped ? " skipped" : ""}" data-id="${esc(it.id)}">
       <div class="time">${it.time ? esc(it.time) : "—"}${it.endTime ? `<small>〜${esc(it.endTime)}</small>` : ""}</div>
@@ -275,6 +287,8 @@ function itemHtml(it) {
         <div class="meta">${esc(ty.label)}${status ? " ・ " + status : ""}</div>
         ${it.memo ? `<div class="note">${esc(it.memo)}</div>` : ""}
         ${it.photo ? `<div class="item-photo"><img src="${it.photo}" alt="写真" loading="lazy"></div>` : ""}
+        ${logs.length ? `<div class="log-list">${logs.map(l => logEntryHtml(l, it.id)).join("")}</div>` : ""}
+        <div class="log-add-row no-print"><button type="button" class="log-add-btn" data-log-item="${esc(it.id)}">📝 記録を足す</button></div>
       </div>
       <div class="amount">${amount > 0 ? yen(amount) : ""}</div>
       <div class="move no-print"><button type="button" data-move="-1" aria-label="上へ">↑</button><button type="button" data-move="1" aria-label="下へ">↓</button></div>
@@ -381,6 +395,20 @@ function renderTrip() {
     b.onclick = (e) => {
       e.stopPropagation();
       openItemDialog(null, b.dataset.day, b.dataset.addAfter);
+    };
+  });
+  // ログ「記録を足す」ボタン
+  app.querySelectorAll(".log-add-btn").forEach((b) => {
+    b.onclick = (e) => {
+      e.stopPropagation();
+      openLogDialog(b.dataset.logItem, null);
+    };
+  });
+  // ログエントリのタップで編集
+  app.querySelectorAll(".log-entry").forEach((el) => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      openLogDialog(el.dataset.itemId, el.dataset.logId);
     };
   });
   app.querySelectorAll(".item:not(.extra):not(.note-item):not(.spend-item)").forEach((el) => {
@@ -592,6 +620,93 @@ document.getElementById("noteDelete").onclick = () => {
   if (!confirm("このメモを削除しますか？")) return;
   trip.notes = trip.notes.filter(x => x.id !== editingNoteId);
   noteDialog.close();
+  renderTrip();
+  save();
+};
+
+// ---------- ログ（行程にぶら下がる記録）の編集 ----------
+const logDialog = document.getElementById("logDialog");
+const logForm = document.getElementById("logForm");
+let editingLogItemId = null;
+let editingLogId = null;
+let pendingLogPhoto = undefined;
+
+function nowTime() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function openLogDialog(itemId, logId) {
+  editingLogItemId = itemId;
+  editingLogId = logId;
+  const item = trip.items.find(x => x.id === itemId);
+  item.logs = item.logs || [];
+  const log = logId ? item.logs.find(x => x.id === logId) : { body: "", time: nowTime(), photo: null };
+  document.getElementById("logDialogTitle").textContent = logId ? "記録を直す" : "記録を残す";
+  logForm.body.value = log.body || "";
+  logForm.time.value = log.time || nowTime();
+  pendingLogPhoto = undefined;
+  logForm.logPhotoFile.value = "";
+  updateLogPhotoPreview(log.photo || null);
+  document.getElementById("logDelete").hidden = !logId;
+  logDialog.showModal();
+}
+
+function updateLogPhotoPreview(src) {
+  const wrap = document.getElementById("logPhotoPreviewWrap");
+  const removeBtn = document.getElementById("logPhotoRemoveBtn");
+  if (src) {
+    wrap.innerHTML = `<img src="${src}" class="photo-preview-img" alt="写真プレビュー">`;
+    removeBtn.style.display = "";
+  } else {
+    wrap.innerHTML = "";
+    removeBtn.style.display = "none";
+  }
+}
+
+document.getElementById("logPhotoSelectBtn").onclick = () => document.getElementById("logPhotoFile").click();
+document.getElementById("logPhotoFile").onchange = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const data = await resizeImage(file);
+  pendingLogPhoto = data;
+  updateLogPhotoPreview(data);
+};
+document.getElementById("logPhotoRemoveBtn").onclick = () => {
+  pendingLogPhoto = null;
+  logForm.logPhotoFile.value = "";
+  updateLogPhotoPreview(null);
+};
+
+logForm.onsubmit = (e) => {
+  e.preventDefault();
+  const item = trip.items.find(x => x.id === editingLogItemId);
+  item.logs = item.logs || [];
+  const data = {
+    body: logForm.body.value.trim(),
+    time: logForm.time.value,
+  };
+  if (pendingLogPhoto !== undefined) {
+    data.photo = pendingLogPhoto;
+  }
+  if (editingLogId) {
+    const log = item.logs.find(x => x.id === editingLogId);
+    if (pendingLogPhoto === undefined) data.photo = log.photo || null;
+    Object.assign(log, data);
+  } else {
+    data.photo = pendingLogPhoto || null;
+    item.logs.push({ id: uid(), ...data });
+  }
+  logDialog.close();
+  renderTrip();
+  save();
+};
+document.getElementById("logCancel").onclick = () => logDialog.close();
+document.getElementById("logDelete").onclick = () => {
+  if (!confirm("この記録を削除しますか？")) return;
+  const item = trip.items.find(x => x.id === editingLogItemId);
+  item.logs = item.logs.filter(x => x.id !== editingLogId);
+  logDialog.close();
   renderTrip();
   save();
 };

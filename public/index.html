@@ -97,6 +97,28 @@
     </form>
   </dialog>
 
+  <dialog id="logDialog">
+    <form id="logForm" method="dialog">
+      <h2 id="logDialogTitle">記録を残す</h2>
+      <label>内容<textarea name="body" rows="4" placeholder="見たもの、感じたこと、ちょっとしたメモ" required></textarea></label>
+      <label>写真（任意）
+        <div class="photo-input-area" id="logPhotoInputArea">
+          <input type="file" name="logPhotoFile" id="logPhotoFile" accept="image/*" style="display:none">
+          <div id="logPhotoPreviewWrap"></div>
+          <button type="button" class="ghost small" id="logPhotoSelectBtn">📷 写真を選ぶ</button>
+          <button type="button" class="ghost small danger" id="logPhotoRemoveBtn" style="display:none">写真を削除</button>
+        </div>
+      </label>
+      <label>時刻<input name="time" type="time"></label>
+      <div class="actions">
+        <button type="button" class="danger" id="logDelete">削除</button>
+        <span class="spacer"></span>
+        <button type="button" id="logCancel">キャンセル</button>
+        <button type="submit" class="primary">保存</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="tripDialog">
     <form id="tripForm" method="dialog">
       <h2 id="tripDialogTitle">旅</h2>

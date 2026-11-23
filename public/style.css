@@ -267,3 +267,17 @@ dialog::backdrop { background: rgba(0,0,0,.6); }
   .card { break-inside: avoid; }
   .item { break-inside: avoid; cursor: default; }
 }
+
+/* ---------- 支出リスト ---------- */
+.expenses-section { margin: 4px 0 8px; }
+.expenses-label { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+.expenses-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
+.expense-row { display: grid; grid-template-columns: 1fr 90px 44px 28px; gap: 6px; align-items: center; }
+.expense-name { background: var(--card2); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; font-size: 14px; width: 100%; }
+.expense-amount { background: var(--card2); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; font-size: 14px; width: 100%; text-align: right; }
+.expense-paid { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 3px; white-space: nowrap; cursor: pointer; }
+.expense-del { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 4px; border-radius: 6px; }
+.expense-del:hover { color: var(--accent); background: rgba(226,103,90,.12); }
+.expenses-total { font-size: 13px; color: var(--muted); margin-top: 4px; text-align: right; }
+.expenses-total span { color: var(--ink); font-weight: 600; }
+.expense-breakdown { grid-column: 2; font-size: 11px; color: var(--muted); display: flex; gap: 6px; flex-wrap: wrap; }

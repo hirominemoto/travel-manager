@@ -127,13 +127,36 @@ function save() {
 
 // ---------- 合計の計算 ----------
 const EXTRA_COLOR = "#c07aa8";
+
+// 行程の支出合計（後方互換: 旧 amount フィールドも読む）
+function itemExpenses(it) {
+  if (it.expenses && it.expenses.length) return it.expenses;
+  if (Number(it.amount) > 0) return [{ id: "legacy", name: "", amount: Number(it.amount), paid: !!it.paid }];
+  return [];
+}
+function itemTotal(it) {
+  return itemExpenses(it).reduce((s, e) => s + (Number(e.amount) || 0), 0);
+}
+function itemPaidTotal(it) {
+  return itemExpenses(it).filter(e => e.paid).reduce((s, e) => s + (Number(e.amount) || 0), 0);
+}
+
 function totals(t) {
-  const sum = (arr) => arr.reduce((s, it) => s + (Number(it.amount) || 0), 0);
+  const sum = (arr) => arr.reduce((s, x) => s + (Number(x.amount) || 0), 0);
   const extras = t.extras || [];
-  const live = t.items.filter((it) => !it.skipped).concat(extras);
-  const byType = TYPES.map((ty) => ({ ...ty, amount: sum(t.items.filter((it) => !it.skipped && typeOf(it.type).key === ty.key)) }));
-  byType.push({ key: "extra", label: "その他の旅費", color: EXTRA_COLOR, amount: sum(extras) });
-  return { total: sum(live), paid: sum(live.filter((it) => it.paid)), byType: byType.filter((x) => x.amount > 0), sum, extraTotal: sum(extras) };
+  const liveItems = t.items.filter((it) => !it.skipped);
+  const itemsTotal = liveItems.reduce((s, it) => s + itemTotal(it), 0);
+  const itemsPaid = liveItems.reduce((s, it) => s + itemPaidTotal(it), 0);
+  const extraTotal = sum(extras);
+  const extraPaid = sum(extras.filter(x => x.paid));
+  const total = itemsTotal + extraTotal;
+  const paid = itemsPaid + extraPaid;
+  const byType = TYPES.map((ty) => ({
+    ...ty,
+    amount: liveItems.filter((it) => typeOf(it.type).key === ty.key).reduce((s, it) => s + itemTotal(it), 0)
+  }));
+  byType.push({ key: "extra", label: "その他の旅費", color: EXTRA_COLOR, amount: extraTotal });
+  return { total, paid, byType: byType.filter((x) => x.amount > 0), sum, extraTotal };
 }
 
 // ---------- 並び順 ----------
@@ -276,8 +299,11 @@ function logEntryHtml(log, itemId) {
 
 function itemHtml(it) {
   const ty = typeOf(it.type);
-  const amount = Number(it.amount) || 0;
-  const status = amount > 0 ? (it.paid ? `<span class="paid">支払い済み</span>` : `<span class="unpaid">未払い</span>`) : "";
+  const exps = itemExpenses(it);
+  const amount = itemTotal(it);
+  const paidAmt = itemPaidTotal(it);
+  const unpaidAmt = amount - paidAmt;
+  const status = amount > 0 ? (unpaidAmt <= 0 ? `<span class="paid">支払い済み</span>` : `<span class="unpaid">未払い ¥${unpaidAmt.toLocaleString()}</span>`) : "";
   const logs = (it.logs || []).slice().sort((a, b) => (a.time || "").localeCompare(b.time || ""));
   return `
     <div class="item${it.skipped ? " skipped" : ""}" data-id="${esc(it.id)}">
@@ -291,6 +317,7 @@ function itemHtml(it) {
         <div class="log-add-row no-print"><button type="button" class="log-add-btn" data-log-item="${esc(it.id)}">📝 記録を足す</button></div>
       </div>
       <div class="amount">${amount > 0 ? yen(amount) : ""}</div>
+      ${exps.length > 1 ? `<div class="expense-breakdown no-print">${exps.map(e => `<span>${e.name ? esc(e.name) + " " : ""}${yen(e.amount)}</span>`).join(" / ")}</div>` : ""}
       <div class="move no-print"><button type="button" data-move="-1" aria-label="上へ">↑</button><button type="button" data-move="1" aria-label="下へ">↓</button></div>
     </div>
     <div class="item-add-row no-print">
@@ -506,6 +533,8 @@ const itemDialog = document.getElementById("itemDialog");
 const itemForm = document.getElementById("itemForm");
 
 let pendingPhotos = []; // 編集中の写真配列（base64文字列）
+let pendingExpenses = []; // 編集中の支出配列
+let pendingNextExpenses = []; // nextItemPanel用
 let insertAfterId = null; // 新規追加時、どの行程の後ろに入れるか
 
 function itemPhotosOf(it) {
@@ -513,6 +542,61 @@ function itemPhotosOf(it) {
   if (it.photos && it.photos.length) return [...it.photos];
   if (it.photo) return [it.photo];
   return [];
+}
+
+// ---------- 支出リスト UI ----------
+function renderExpenseRows(listId, totalId, totalAmtId, expenses, onRemove) {
+  const list = document.getElementById(listId);
+  const totalEl = document.getElementById(totalId);
+  const totalAmtEl = document.getElementById(totalAmtId);
+  list.innerHTML = expenses.map((e, i) => `
+    <div class="expense-row" data-idx="${i}">
+      <input type="text" class="expense-name" placeholder="名前（例：電車代）" value="${esc(e.name || "")}" data-idx="${i}">
+      <input type="number" class="expense-amount" inputmode="numeric" min="0" step="1" placeholder="0" value="${e.amount || ""}" data-idx="${i}">
+      <label class="expense-paid"><input type="checkbox" class="expense-paid-chk" data-idx="${i}"${e.paid ? " checked" : ""}> 済</label>
+      <button type="button" class="expense-del" data-idx="${i}" title="削除">✕</button>
+    </div>`).join("");
+  // イベント
+  list.querySelectorAll(".expense-name").forEach(inp => {
+    inp.oninput = () => { expenses[Number(inp.dataset.idx)].name = inp.value; };
+  });
+  list.querySelectorAll(".expense-amount").forEach(inp => {
+    inp.oninput = () => { expenses[Number(inp.dataset.idx)].amount = Math.max(0, Math.round(Number(inp.value) || 0)); updateExpenseTotal(totalId, totalAmtId, expenses); };
+  });
+  list.querySelectorAll(".expense-paid-chk").forEach(chk => {
+    chk.onchange = () => { expenses[Number(chk.dataset.idx)].paid = chk.checked; };
+  });
+  list.querySelectorAll(".expense-del").forEach(btn => {
+    btn.onclick = () => { onRemove(Number(btn.dataset.idx)); };
+  });
+  updateExpenseTotal(totalId, totalAmtId, expenses);
+}
+function updateExpenseTotal(totalId, totalAmtId, expenses) {
+  const total = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const totalEl = document.getElementById(totalId);
+  const totalAmtEl = document.getElementById(totalAmtId);
+  if (!totalEl || !totalAmtEl) return;
+  if (expenses.length > 0) {
+    totalEl.style.display = "";
+    totalAmtEl.textContent = yen(total);
+  } else {
+    totalEl.style.display = "none";
+  }
+}
+function addExpenseRow(listId, totalId, totalAmtId, expenses) {
+  expenses.push({ id: uid(), name: "", amount: 0, paid: false });
+  renderExpenseRows(listId, totalId, totalAmtId, expenses, (idx) => {
+    expenses.splice(idx, 1);
+    renderExpenseRows(listId, totalId, totalAmtId, expenses, (i) => {
+      expenses.splice(i, 1);
+      renderExpenseRows(listId, totalId, totalAmtId, expenses, arguments.callee);
+      updateExpenseTotal(totalId, totalAmtId, expenses);
+    });
+    updateExpenseTotal(totalId, totalAmtId, expenses);
+  });
+  // 追加した行の名前inputにフォーカス
+  const rows = document.querySelectorAll(`#${listId} .expense-row`);
+  if (rows.length > 0) rows[rows.length - 1].querySelector(".expense-name").focus();
 }
 
 function openItemDialog(id, day, afterId = null) {
@@ -529,10 +613,18 @@ function openItemDialog(id, day, afterId = null) {
   itemForm.type.value = typeOf(it.type).key;
   itemForm.time.value = it.time || "";
   itemForm.endTime.value = it.endTime || "";
-  itemForm.amount.value = it.amount ? it.amount : "";
-  itemForm.paid.checked = !!it.paid;
   itemForm.skipped.checked = !!it.skipped;
   itemForm.memo.value = it.memo || "";
+  // 支出リスト（後方互換: 旧 amount → expenses に変換）
+  pendingExpenses = itemExpenses(it).map(e => ({ ...e }));
+  renderExpenseRows("expensesList", "expensesTotal", "expensesTotalAmt", pendingExpenses, (idx) => {
+    pendingExpenses.splice(idx, 1);
+    renderExpenseRows("expensesList", "expensesTotal", "expensesTotalAmt", pendingExpenses, (i) => {
+      pendingExpenses.splice(i, 1);
+      renderExpenseRows("expensesList", "expensesTotal", "expensesTotalAmt", pendingExpenses, arguments.callee);
+    });
+  });
+  document.getElementById("addExpenseBtn").onclick = () => addExpenseRow("expensesList", "expensesTotal", "expensesTotalAmt", pendingExpenses);
   // 写真（複数対応）
   pendingPhotos = itemPhotosOf(it);
   document.getElementById("photoFile").value = "";
@@ -579,12 +671,16 @@ function submitItemForm(andAddNext = false) {
     type: f.type.value,
     time: f.time.value,
     endTime: f.endTime.value,
-    amount: Math.max(0, Math.round(Number(f.amount.value) || 0)),
-    paid: f.paid.checked,
     skipped: f.skipped.checked,
     memo: f.memo.value.trim(),
   };
   if (!data.title) return false;
+  // 支出リスト（空のものを除去）
+  data.expenses = pendingExpenses.filter(e => e.name || e.amount > 0).map(e => ({
+    id: e.id || uid(), name: e.name || "", amount: Math.max(0, Math.round(Number(e.amount) || 0)), paid: !!e.paid
+  }));
+  data.amount = null; // 旧フィールドはクリア
+  data.paid = null;
   // 写真を反映（複数対応）
   data.photos = [...pendingPhotos];
   data.photo = null; // 旧フィールドはクリア
@@ -635,9 +731,17 @@ function openNextItemPanel(afterId, day) {
   nextItemForm.time.value = defaultTime;
   nextItemForm.endTime.value = "";
   nextItemForm.title.value = "";
-  nextItemForm.amount.value = "";
   nextItemForm.memo.value = "";
-  nextItemForm.paid.checked = false;
+  // 支出リスト初期化
+  pendingNextExpenses = [];
+  renderExpenseRows("nextExpensesList", "nextExpensesTotal", "nextExpensesTotalAmt", pendingNextExpenses, (idx) => {
+    pendingNextExpenses.splice(idx, 1);
+    renderExpenseRows("nextExpensesList", "nextExpensesTotal", "nextExpensesTotalAmt", pendingNextExpenses, (i) => {
+      pendingNextExpenses.splice(i, 1);
+      renderExpenseRows("nextExpensesList", "nextExpensesTotal", "nextExpensesTotalAmt", pendingNextExpenses, arguments.callee);
+    });
+  });
+  document.getElementById("nextAddExpenseBtn").onclick = () => addExpenseRow("nextExpensesList", "nextExpensesTotal", "nextExpensesTotalAmt", pendingNextExpenses);
   pendingNextPhotos = [];
   document.getElementById("nextPhotoFile").value = "";
   renderPhotoThumbs("nextPhotoPreviewWrap", pendingNextPhotos, (idx) => {
@@ -653,11 +757,14 @@ function submitNextItemForm(andAddMore = false) {
   const f = nextItemForm;
   const title = f.title.value.trim();
   if (!title) { f.title.focus(); return; }
+  const expenses = pendingNextExpenses.filter(e => e.name || e.amount > 0).map(e => ({
+    id: e.id || uid(), name: e.name || "", amount: Math.max(0, Math.round(Number(e.amount) || 0)), paid: !!e.paid
+  }));
   const it = {
     id: uid(), title, date: f.date.value, type: f.type.value,
     time: f.time.value, endTime: f.endTime.value,
-    amount: Math.max(0, Math.round(Number(f.amount.value) || 0)),
-    paid: f.paid.checked, skipped: false, memo: f.memo.value.trim(),
+    expenses, amount: null, paid: null,
+    skipped: false, memo: f.memo.value.trim(),
     photos: [...pendingNextPhotos], photo: null, logs: [],
   };
   insertAfter(nextItemAfterId, it);

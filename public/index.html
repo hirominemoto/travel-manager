@@ -24,9 +24,11 @@
         <label>出発・開始<input name="time" type="time"></label>
         <label>到着・終了<input name="endTime" type="time"></label>
       </div>
-      <div class="row">
-        <label>金額（円）<input name="amount" type="number" inputmode="numeric" min="0" step="1" placeholder="0"></label>
-        <label class="check"><input name="paid" type="checkbox"> 支払い済み</label>
+      <div class="expenses-section">
+        <div class="expenses-label">支出</div>
+        <div id="expensesList" class="expenses-list"></div>
+        <button type="button" class="ghost small" id="addExpenseBtn">＋ 支出を追加</button>
+        <div class="expenses-total" id="expensesTotal" style="display:none">この行程の合計：<span id="expensesTotalAmt">¥0</span></div>
       </div>
       <label>メモ・記録<textarea name="memo" rows="3" placeholder="気づいたこと、感想、実費など"></textarea></label>
       <label>写真
@@ -59,9 +61,11 @@
           <label>出発・開始<input name="time" type="time"></label>
           <label>到着・終了<input name="endTime" type="time"></label>
         </div>
-        <div class="row">
-          <label>金額（円）<input name="amount" type="number" inputmode="numeric" min="0" step="1" placeholder="0"></label>
-          <label class="check"><input name="paid" type="checkbox"> 支払い済み</label>
+        <div class="expenses-section">
+          <div class="expenses-label">支出</div>
+          <div id="nextExpensesList" class="expenses-list"></div>
+          <button type="button" class="ghost small" id="nextAddExpenseBtn">＋ 支出を追加</button>
+          <div class="expenses-total" id="nextExpensesTotal" style="display:none">この行程の合計：<span id="nextExpensesTotalAmt">¥0</span></div>
         </div>
         <label>メモ・記録<textarea name="memo" rows="2" placeholder="気づいたこと、感想など"></textarea></label>
         <label>写真

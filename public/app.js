@@ -138,6 +138,13 @@ function totals(t) {
 
 // ---------- 並び順 ----------
 // 時刻のある行程を時刻順に入れる。時刻のない行程は今の位置のまま
+// 指定した行程IDのすぐ後ろに挿入（時刻なし新規行程用）
+function insertAfter(afterId, item) {
+  const idx = trip.items.findIndex(it => it.id === afterId);
+  if (idx === -1) trip.items.push(item);
+  else trip.items.splice(idx + 1, 0, item);
+}
+
 function placeByTime(item) {
   const others = trip.items.filter((it) => it.id !== item.id);
   if (!item.time) {
@@ -271,7 +278,8 @@ function itemHtml(it) {
       </div>
       <div class="amount">${amount > 0 ? yen(amount) : ""}</div>
       <div class="move no-print"><button type="button" data-move="-1" aria-label="上へ">↑</button><button type="button" data-move="1" aria-label="下へ">↓</button></div>
-    </div>`;
+    </div>
+    <div class="item-add-row no-print"><button type="button" class="item-add-btn" data-add-after="${esc(it.id)}" data-day="${esc(it.date || '')}">＋</button></div>`;
 }
 
 function renderTrip() {
@@ -369,6 +377,12 @@ function renderTrip() {
   app.querySelectorAll("[data-note]").forEach((el) => (el.onclick = () => openNoteDialog(el.dataset.note)));
   document.getElementById("addSpend").onclick = () => openSpendDialog(null);
   app.querySelectorAll("[data-spend]").forEach((el) => (el.onclick = () => openSpendDialog(el.dataset.spend)));
+  app.querySelectorAll("[data-add-after]").forEach((b) => {
+    b.onclick = (e) => {
+      e.stopPropagation();
+      openItemDialog(null, b.dataset.day, b.dataset.addAfter);
+    };
+  });
   app.querySelectorAll(".item:not(.extra):not(.note-item):not(.spend-item)").forEach((el) => {
     el.onclick = (e) => {
       const mv = e.target.closest("[data-move]");
@@ -387,9 +401,11 @@ const itemDialog = document.getElementById("itemDialog");
 const itemForm = document.getElementById("itemForm");
 
 let pendingPhoto = undefined; // undefined=変更なし, null=削除, "data:..."=新しい写真
+let insertAfterId = null; // 新規追加時、どの行程の後ろに入れるか
 
-function openItemDialog(id, day) {
+function openItemDialog(id, day, afterId = null) {
   editingItemId = id;
+  insertAfterId = afterId;
   const it = id ? trip.items.find((x) => x.id === id) : { date: day || trip.start, type: "move", title: "", time: "", endTime: "", amount: "", paid: false, skipped: false, memo: "", photo: null };
   document.getElementById("itemDialogTitle").textContent = id ? "行程を直す" : "行程を足す";
   const days = tripDays(trip).filter(Boolean);
@@ -464,8 +480,12 @@ itemForm.onsubmit = (e) => {
     if (moved) placeByTime(it);
   } else {
     const it = { id: uid(), ...data };
-    if (data.time) placeByTime(it);
-    else {
+    if (insertAfterId) {
+      // 行程の「＋」から追加：指定行程のすぐ後ろ
+      insertAfter(insertAfterId, it);
+    } else if (data.time) {
+      placeByTime(it);
+    } else {
       // 時刻なし：その日の最後に足す
       let last = -1;
       trip.items.forEach((x, i) => { if (x.date <= data.date) last = i; });

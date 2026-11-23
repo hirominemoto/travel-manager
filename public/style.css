@@ -92,6 +92,22 @@ label.skip { color: var(--muted); }
 .add-day { margin: 10px 0 0; }
 .breakdown div { display: flex; justify-content: space-between; padding: 3px 0; }
 
+/* 行程間の＋ボタン */
+.item-add-row {
+  display: flex; justify-content: center; padding: 0;
+  opacity: 0; transition: opacity .15s;
+  height: 20px; align-items: center;
+}
+.item-add-row:hover, .item + .item-add-row:focus-within { opacity: 1; }
+/* 行程にホバーしたとき下の＋を見せる */
+.item:hover + .item-add-row { opacity: 1; }
+.item-add-btn {
+  font-size: 13px; font-weight: 700; padding: 0 14px; height: 20px; line-height: 20px;
+  border-radius: 10px; border: 1px dashed var(--line); background: transparent;
+  color: var(--muted); cursor: pointer;
+}
+.item-add-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(226,103,90,.08); }
+
 /* FAB */
 .fab {
   position: fixed; right: 20px; bottom: calc(24px + env(safe-area-inset-bottom));
